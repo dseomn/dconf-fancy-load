@@ -258,9 +258,7 @@ def main(
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config-dir",
-        default=pathlib.Path.home().joinpath(
-            ".config", "dconf-fancy-load", "conf.d"
-        ),
+        default=pathlib.Path.home().joinpath(".config", "dconf-fancy-load"),
         type=pathlib.Path,
     )
     parser.add_argument("--dry-run", action="store_true")
