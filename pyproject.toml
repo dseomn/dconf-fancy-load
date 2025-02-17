@@ -1,3 +1,11 @@
+[tool.black]
+line-length = 80
+
+[tool.isort]
+profile = "google"
+skip_gitignore = true
+src_paths = ["."]
+
 [tool.pytest.ini_options]
 addopts = """\
   --cov=. \

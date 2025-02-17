@@ -16,4 +16,6 @@
 
 set -euo pipefail
 
+black --check --diff .
+isort --check --diff .
 pytest
