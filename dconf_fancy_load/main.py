@@ -38,6 +38,7 @@ Example config file:
 import argparse
 from collections.abc import Collection, Mapping
 import os
+import pathlib
 import subprocess
 import textwrap
 from typing import Any
@@ -86,7 +87,7 @@ _SCHEMA = {
 }
 
 
-def _is_key(config_item: Mapping[str, Any], parent: str) -> bool:
+def _is_key(config_item: Mapping[str, Any], *, parent: str) -> bool:
     """Returns true if the item is a key, false if it's a directory.
 
     Args:
@@ -97,12 +98,10 @@ def _is_key(config_item: Mapping[str, Any], parent: str) -> bool:
         ValueError: The item is neither or both.
     """
     if "dir" in config_item and "key" in config_item:
-        raise ValueError(
-            "Item in {!r} has both 'dir' and 'key' attrs.".format(parent)
-        )
+        raise ValueError(f"Item in {parent!r} has both 'dir' and 'key' attrs.")
     elif "dir" not in config_item and "key" not in config_item:
         raise ValueError(
-            "Item in {!r} has neither a 'dir' nor a 'key' attr.".format(parent)
+            f"Item in {parent!r} has neither a 'dir' nor a 'key' attr."
         )
     return "key" in config_item
 
@@ -110,6 +109,7 @@ def _is_key(config_item: Mapping[str, Any], parent: str) -> bool:
 def _set_keys_in_dir(
     path: str,
     values: Mapping[str, str],
+    *,
     subprocess_run: Any,
     dry_run: bool = False,
 ) -> None:
@@ -124,10 +124,10 @@ def _set_keys_in_dir(
     keyfile_lines = ["[/]\n"]
     # Sort keys to make unit testing easier. (It doesn't matter to dconf load.)
     for key, value in sorted(values.items(), key=lambda kv: kv[0]):
-        keyfile_lines.append("{}={}\n".format(key, value))
+        keyfile_lines.append(f"{key}={value}\n")
     keyfile = "".join(keyfile_lines)
     if dry_run:
-        print("Load: {}\n{}".format(path, textwrap.indent(keyfile, "  ")))
+        print(f"Load: {path}\n{textwrap.indent(keyfile, '  ')}")
     else:
         subprocess_run(
             ["dconf", "load", path], input=keyfile, text=True, check=True
@@ -136,8 +136,9 @@ def _set_keys_in_dir(
 
 def _reset_path(
     path: str,
-    subprocess_run: Any,
+    *,
     preserve: Collection[str] = (),
+    subprocess_run: Any,
     dry_run: bool = False,
 ) -> None:
     """Selectively resets a key or directory.
@@ -152,7 +153,7 @@ def _reset_path(
     """
     if not preserve or not path.endswith("/"):
         if dry_run:
-            print("Reset: {}".format(path))
+            print(f"Reset: {path}")
         else:
             subprocess_run(["dconf", "reset", "-f", path], check=True)
         return
@@ -165,14 +166,15 @@ def _reset_path(
             continue
         _reset_path(
             child_path,
-            subprocess_run,
-            {x for x in preserve if x.startswith(child_path)},
+            preserve={x for x in preserve if x.startswith(child_path)},
+            subprocess_run=subprocess_run,
             dry_run=dry_run,
         )
 
 
 def load_config(
     config: Any,
+    *,
     path: str = "/",
     dry_run: bool = False,
     subprocess_run: Any = subprocess.run,
@@ -193,7 +195,7 @@ def load_config(
     preserve = set()
     values = {}  # Map from key to value to set in the current directory.
     for config_item in config:
-        if _is_key(config_item, path):
+        if _is_key(config_item, parent=path):
             config_item_path = path + config_item["key"]
             if "value" in config_item:
                 values[config_item["key"]] = config_item["value"]
@@ -201,7 +203,9 @@ def load_config(
             if "reset" in config_item:
                 if config_item["reset"]:
                     _reset_path(
-                        config_item_path, subprocess_run, dry_run=dry_run
+                        config_item_path,
+                        subprocess_run=subprocess_run,
+                        dry_run=dry_run,
                     )
                 else:
                     preserve.add(config_item_path)
@@ -210,7 +214,7 @@ def load_config(
             if "children" in config_item:
                 config_item_preserve = load_config(
                     config_item["children"],
-                    config_item_path,
+                    path=config_item_path,
                     dry_run=dry_run,
                     subprocess_run=subprocess_run,
                 )
@@ -220,8 +224,8 @@ def load_config(
                 if config_item["reset"]:
                     _reset_path(
                         config_item_path,
-                        subprocess_run,
-                        config_item_preserve,
+                        subprocess_run=subprocess_run,
+                        preserve=config_item_preserve,
                         dry_run=dry_run,
                     )
                 # Preserve the directory either way. Either it was already
@@ -233,18 +237,22 @@ def load_config(
                 # from the children.
                 preserve.update(config_item_preserve)
     if values:
-        _set_keys_in_dir(path, values, subprocess_run, dry_run=dry_run)
+        _set_keys_in_dir(
+            path, values, subprocess_run=subprocess_run, dry_run=dry_run
+        )
     return preserve
 
 
 def main(
-    config_directory: str,
+    *,
+    config_directory: pathlib.Path,
     dry_run: bool = False,
     subprocess_run: Any = subprocess.run,
 ) -> None:
     """Main.
 
     Args:
+        config_directory: Where to look for config files.
         dry_run: If true, nothing is changed in dconf, and actions are printed
             instead.
         subprocess_run: Normally subprocess.run, but can be overriden in tests.
@@ -252,15 +260,14 @@ def main(
     jinja_env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(config_directory), autoescape=False
     )
-    with os.scandir(config_directory) as dir_iter:
-        for entry in sorted(dir_iter, key=lambda entry: entry.name):
-            if not entry.name.endswith(".yaml"):
-                continue
-            config = yaml.safe_load(
-                jinja_env.get_template(entry.name).render(env=os.environ)
-            )
-            jsonschema.validate(config, _SCHEMA)
-            load_config(config, dry_run=dry_run, subprocess_run=subprocess_run)
+    for path in sorted(config_directory.iterdir()):
+        if not path.name.endswith(".yaml"):
+            continue
+        config = yaml.safe_load(
+            jinja_env.get_template(path.name).render(env=os.environ)
+        )
+        jsonschema.validate(config, _SCHEMA)
+        load_config(config, dry_run=dry_run, subprocess_run=subprocess_run)
 
 
 if __name__ == "__main__":
@@ -275,8 +282,8 @@ if __name__ == "__main__":
     if args.dry_run is None:
         raise RuntimeError("Specify either --dry-run or --force.")
     main(
-        os.path.join(
-            os.environ["HOME"], ".config", "dconf-fancy-load", "conf.d"
+        config_directory=pathlib.Path.home().joinpath(
+            ".config", "dconf-fancy-load", "conf.d"
         ),
         dry_run=args.dry_run,
     )

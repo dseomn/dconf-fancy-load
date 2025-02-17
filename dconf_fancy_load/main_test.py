@@ -14,6 +14,7 @@
 
 from collections.abc import Collection, Mapping, Sequence
 import os
+import pathlib
 import subprocess
 import tempfile
 import textwrap
@@ -30,7 +31,7 @@ class LoadConfigTest(unittest.TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        self._run = mock.create_autospec(subprocess.run)
+        self._run = mock.create_autospec(subprocess.run, spec_set=True)
 
     def _load_config(self, *args: Any, **kwargs: Any) -> Collection[str]:
         """Calls load_config with appropriate mocks.
@@ -42,13 +43,7 @@ class LoadConfigTest(unittest.TestCase):
         Returns:
             Whatever load_config returns.
         """
-        return main.load_config(
-            *args,
-            **kwargs,
-            # Supress: "load_config" gets multiple values for keyword argument
-            # "subprocess_run"
-            subprocess_run=self._run,  # type: ignore[misc]
-        )
+        return main.load_config(*args, **kwargs, subprocess_run=self._run)
 
     def _mock_dconf_list(self, paths: Mapping[str, Sequence[str]]) -> None:
         """Mocks `dconf list`.
@@ -63,7 +58,7 @@ class LoadConfigTest(unittest.TestCase):
             **kwargs: Any,
         ) -> subprocess.CompletedProcess[str]:
             completed_process = mock.create_autospec(
-                subprocess.CompletedProcess
+                subprocess.CompletedProcess, instance=True
             )
             if args[:2] != ["dconf", "list"]:
                 return completed_process
@@ -238,7 +233,7 @@ class MainTest(unittest.TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        self._run = mock.create_autospec(subprocess.run)
+        self._run = mock.create_autospec(subprocess.run, spec_set=True)
 
     def _main(self, files: Mapping[str, str]) -> None:
         """Calls main.
@@ -247,11 +242,11 @@ class MainTest(unittest.TestCase):
             file: Map from filename to string file contents, to put in the
                 directory read by main.
         """
-        with tempfile.TemporaryDirectory() as conf_dir:
+        with tempfile.TemporaryDirectory() as conf_dir_name:
+            conf_dir = pathlib.Path(conf_dir_name)
             for name, contents in files.items():
-                with open(os.path.join(conf_dir, name), "w") as fh:
-                    fh.write(contents)
-            main.main(conf_dir, subprocess_run=self._run)
+                (conf_dir / name).write_text(contents)
+            main.main(config_directory=conf_dir, subprocess_run=self._run)
 
     def test_ignore_unknown_file(self) -> None:
         self._main({"foo.not-yaml": "bar"})
@@ -261,15 +256,13 @@ class MainTest(unittest.TestCase):
         files = {}
         expected_reset_paths = []
         for i in range(100):
-            files["{:02d}.yaml".format(i)] = textwrap.dedent(
-                """\
-                    - key: key-{:02d}
+            files[f"{i:02d}.yaml"] = textwrap.dedent(
+                f"""\
+                    - key: key-{i:02d}
                       reset: true
-                """.format(
-                    i
-                )
+                """
             )
-            expected_reset_paths.append("/key-{:02d}".format(i))
+            expected_reset_paths.append(f"/key-{i:02d}")
         self._main(files)
         actual_reset_paths = [call[1][0][3] for call in self._run.mock_calls]
         self.assertSequenceEqual(actual_reset_paths, expected_reset_paths)
@@ -284,7 +277,7 @@ class MainTest(unittest.TestCase):
             self._main({"foo.yaml": '- key: foo\n  reset: "false"\n'})
 
     def test_templating(self) -> None:
-        os.environ["FOO"] = "kumquat"
+        self.enterContext(mock.patch.dict(os.environ, {"FOO": "kumquat"}))
         self._main(
             {
                 "foo.yaml": textwrap.dedent(
