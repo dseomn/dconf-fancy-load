@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+addopts = """\
+  --cov=. \
+  --cov-branch \
+  --cov-report=term-missing \
+  """
