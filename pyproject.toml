@@ -1,6 +1,11 @@
 [tool.black]
 line-length = 80
 
+[tool.coverage.run]
+omit = [
+  "**/*_test.py",
+]
+
 [tool.isort]
 profile = "google"
 skip_gitignore = true
