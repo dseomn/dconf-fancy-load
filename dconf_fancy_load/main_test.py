@@ -36,11 +36,11 @@ class LoadConfigTest(unittest.TestCase):
         """Calls load_config with appropriate mocks.
 
         Args:
-          *args: Args to load_config.
-          **kwargs: Ditto.
+            *args: Args to load_config.
+            **kwargs: Ditto.
 
         Returns:
-          Whatever load_config returns.
+            Whatever load_config returns.
         """
         return main.load_config(
             *args,
@@ -54,8 +54,8 @@ class LoadConfigTest(unittest.TestCase):
         """Mocks `dconf list`.
 
         Args:
-          paths: Map from path passed to `donf list` to list of paths printed by
-            `dconf list`.
+            paths: Map from path passed to `donf list` to list of paths printed
+                by `dconf list`.
         """
 
         def side_effect(
@@ -244,8 +244,8 @@ class MainTest(unittest.TestCase):
         """Calls main.
 
         Args:
-          file: Map from filename to string file contents, to put in the directory
-            read by main.
+            file: Map from filename to string file contents, to put in the
+                directory read by main.
         """
         with tempfile.TemporaryDirectory() as conf_dir:
             for name, contents in files.items():
@@ -263,9 +263,9 @@ class MainTest(unittest.TestCase):
         for i in range(100):
             files["{:02d}.yaml".format(i)] = textwrap.dedent(
                 """\
-          - key: key-{:02d}
-            reset: true
-      """.format(
+                    - key: key-{:02d}
+                      reset: true
+                """.format(
                     i
                 )
             )
@@ -289,17 +289,17 @@ class MainTest(unittest.TestCase):
             {
                 "foo.yaml": textwrap.dedent(
                     """\
-                - key: foo
-                  value: "'{{ env['FOO'] }}'"
-            """
+                        - key: foo
+                          value: "'{{ env['FOO'] }}'"
+                    """
                 ),
             }
         )
         expected_keyfile = textwrap.dedent(
             """\
-        [/]
-        foo='kumquat'
-    """
+                [/]
+                foo='kumquat'
+            """
         )
         self.assertEqual(1, len(self._run.mock_calls))
         self.assertEqual(expected_keyfile, self._run.mock_calls[0][2]["input"])

@@ -18,21 +18,21 @@ environment variables in values, or to selectively reset keys. This does.
 
 Example config file:
 
-  - dir: path
-    children:
-    - dir: to
+    - dir: path
       children:
-      - dir: dir
-        reset: true  # Resets everything not explicitly listed in children.
+      - dir: to
         children:
-        - dir: sub-directory
-          reset: false  # Shadow's the parent directory's reset value.
-        - key: some-key
-          value: "['a', 'b']"  # YAML-quoted GVariant value.
-        - key: other-key
-          reset: false  # This key is neither set or reset.
-        - key: path-to-a-file
-          value: "'{{ env['HOME'] }}/some/path'"
+        - dir: dir
+          reset: true  # Resets everything not explicitly listed in children.
+          children:
+          - dir: sub-directory
+            reset: false  # Shadow's the parent directory's reset value.
+          - key: some-key
+            value: "['a', 'b']"  # YAML-quoted GVariant value.
+          - key: other-key
+            reset: false  # This key is neither set or reset.
+          - key: path-to-a-file
+            value: "'{{ env['HOME'] }}/some/path'"
 """
 
 import argparse
@@ -90,11 +90,11 @@ def _is_key(config_item: Mapping[str, Any], parent: str) -> bool:
     """Returns true if the item is a key, false if it's a directory.
 
     Args:
-      config_item: A single item from the YAML config, as a Python dict.
-      parent: DConf path to the item's parent directory.
+        config_item: A single item from the YAML config, as a Python dict.
+        parent: DConf path to the item's parent directory.
 
     Raises:
-      ValueError: The item is neither or both.
+        ValueError: The item is neither or both.
     """
     if "dir" in config_item and "key" in config_item:
         raise ValueError(
@@ -116,10 +116,10 @@ def _set_keys_in_dir(
     """Sets DConf keys in a directory.
 
     Args:
-      path: Directory.
-      values: Map from relative key to value to set in the directory.
-      subprocess_run: Normally subprocess.run, but can be overriden in tests.
-      dry_run: If true, just print actions.
+        path: Directory.
+        values: Map from relative key to value to set in the directory.
+        subprocess_run: Normally subprocess.run, but can be overriden in tests.
+        dry_run: If true, just print actions.
     """
     keyfile_lines = ["[/]\n"]
     # Sort keys to make unit testing easier. (It doesn't matter to dconf load.)
@@ -143,11 +143,12 @@ def _reset_path(
     """Selectively resets a key or directory.
 
     Args:
-      path: Absolute path to selectively reset, e.g., '/', '/foo/', or '/foo/bar'.
-      preserve: Collection of absolute child paths to not reset. Dirs end in '/',
-        keys don't. This is ignored if path is a key.
-      subprocess_run: Normally subprocess.run, but can be overriden in tests.
-      dry_run: If true, just print actions.
+        path: Absolute path to selectively reset, e.g., '/', '/foo/', or
+            '/foo/bar'.
+        preserve: Collection of absolute child paths to not reset. Dirs end in
+            '/', keys don't. This is ignored if path is a key.
+        subprocess_run: Normally subprocess.run, but can be overriden in tests.
+        dry_run: If true, just print actions.
     """
     if not preserve or not path.endswith("/"):
         if dry_run:
@@ -179,15 +180,15 @@ def load_config(
     """Loads DConf values from yaml.
 
     Args:
-      config: Python list parsed from a YAML config. See module docstring for
-        format.
-      path: Root DConf path of the config, e.g., '/' or '/foo/'.
-      dry_run: If true, just print actions.
-      subprocess_run: Normally subprocess.run, but can be overriden in tests.
+        config: Python list parsed from a YAML config. See module docstring for
+            format.
+        path: Root DConf path of the config, e.g., '/' or '/foo/'.
+        dry_run: If true, just print actions.
+        subprocess_run: Normally subprocess.run, but can be overriden in tests.
 
     Returns:
-      Collection of paths to not reset, suitable for passing as the preserve
-      argument to _reset_path.
+        Collection of paths to not reset, suitable for passing as the preserve
+        argument to _reset_path.
     """
     preserve = set()
     values = {}  # Map from key to value to set in the current directory.
@@ -223,13 +224,13 @@ def load_config(
                         config_item_preserve,
                         dry_run=dry_run,
                     )
-                # Preserve the directory either way. Either it was already reset, so
-                # preserving it is an optimization, or the entire directory needs to be
-                # preserved.
+                # Preserve the directory either way. Either it was already
+                # reset, so preserving it is an optimization, or the entire
+                # directory needs to be preserved.
                 preserve.add(config_item_path)
             else:
-                # No explicit reset parameter, so preserve the preserved paths from the
-                # children.
+                # No explicit reset parameter, so preserve the preserved paths
+                # from the children.
                 preserve.update(config_item_preserve)
     if values:
         _set_keys_in_dir(path, values, subprocess_run, dry_run=dry_run)
@@ -244,9 +245,9 @@ def main(
     """Main.
 
     Args:
-      dry_run: If true, nothing is changed in dconf, and actions are printed
-        instead.
-      subprocess_run: Normally subprocess.run, but can be overriden in tests.
+        dry_run: If true, nothing is changed in dconf, and actions are printed
+            instead.
+        subprocess_run: Normally subprocess.run, but can be overriden in tests.
     """
     jinja_env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(config_directory), autoescape=False
