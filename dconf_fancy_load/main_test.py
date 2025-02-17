@@ -114,19 +114,19 @@ class LoadConfigTest(unittest.TestCase):
                 "/",
                 textwrap.dedent(
                     """\
-                [/]
-                foo='bar'
-            """
+                        [/]
+                        foo='bar'
+                    """
                 ),
             ),
             (
                 "/some-dir/other-dir/",
                 textwrap.dedent(
                     """\
-                [/]
-                apple='orange'
-                kumquat=17
-            """
+                        [/]
+                        apple='orange'
+                        kumquat=17
+                    """
                 ),
             ),
         ):
