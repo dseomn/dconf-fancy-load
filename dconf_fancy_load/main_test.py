@@ -246,7 +246,10 @@ class MainTest(unittest.TestCase):
             conf_dir = pathlib.Path(conf_dir_name)
             for name, contents in files.items():
                 (conf_dir / name).write_text(contents)
-            main.main(config_directory=conf_dir, subprocess_run=self._run)
+            main.main(
+                args=[f"--config-dir={conf_dir}"],
+                subprocess_run=self._run,
+            )
 
     def test_ignore_unknown_file(self) -> None:
         self._main({"foo.not-yaml": "bar"})

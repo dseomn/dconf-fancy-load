@@ -36,10 +36,11 @@ Example config file:
 """
 
 import argparse
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 import os
 import pathlib
 import subprocess
+import sys
 import textwrap
 from typing import Any
 
@@ -245,38 +246,39 @@ def load_config(
 
 def main(
     *,
-    config_directory: pathlib.Path,
-    dry_run: bool = False,
+    args: Sequence[str] = sys.argv[1:],
     subprocess_run: Any = subprocess.run,
 ) -> None:
     """Main.
 
     Args:
-        config_directory: Where to look for config files.
-        dry_run: If true, nothing is changed in dconf, and actions are printed
-            instead.
+        args: Command line arguments.
         subprocess_run: Normally subprocess.run, but can be overriden in tests.
     """
-    jinja_env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(config_directory), autoescape=False
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config-dir",
+        default=pathlib.Path.home().joinpath(
+            ".config", "dconf-fancy-load", "conf.d"
+        ),
+        type=pathlib.Path,
     )
-    for path in sorted(config_directory.iterdir()):
+    parser.add_argument("--dry-run", action="store_true")
+    parsed_args = parser.parse_args(args)
+    jinja_env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(parsed_args.config_dir), autoescape=False
+    )
+    for path in sorted(parsed_args.config_dir.iterdir()):
         if not path.name.endswith(".yaml"):
             continue
         config = yaml.safe_load(
             jinja_env.get_template(path.name).render(env=os.environ)
         )
         jsonschema.validate(config, _SCHEMA)
-        load_config(config, dry_run=dry_run, subprocess_run=subprocess_run)
+        load_config(
+            config, dry_run=parsed_args.dry_run, subprocess_run=subprocess_run
+        )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
-    main(
-        config_directory=pathlib.Path.home().joinpath(
-            ".config", "dconf-fancy-load", "conf.d"
-        ),
-        dry_run=args.dry_run,
-    )
+    main()
