@@ -245,5 +245,5 @@ if __name__ == '__main__':
   if args.dry_run is None:
     raise RuntimeError('Specify either --dry-run or --force.')
   main(
-      os.path.join(os.getenv('HOME'), '.config', 'dconf-load-yaml', 'conf.d'),
+      os.path.join(os.getenv('HOME'), '.config', 'dconf-fancy-load', 'conf.d'),
       dry_run=args.dry_run)

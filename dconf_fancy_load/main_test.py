@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for dconf_load_yaml.main."""
 
 import os
 import subprocess
@@ -22,7 +21,7 @@ from unittest import mock
 
 import jsonschema
 
-from dconf_load_yaml import main
+from dconf_fancy_load import main
 
 
 class LoadConfigTest(unittest.TestCase):
