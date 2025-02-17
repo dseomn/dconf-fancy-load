@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections.abc import Collection, Mapping, Sequence
 import os
 import subprocess
 import tempfile
 import textwrap
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -26,11 +28,11 @@ from dconf_fancy_load import main
 
 class LoadConfigTest(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self._run = mock.create_autospec(subprocess.run)
 
-    def _load_config(self, *args, **kwargs):
+    def _load_config(self, *args: Any, **kwargs: Any) -> Collection[str]:
         """Calls load_config with appropriate mocks.
 
         Args:
@@ -40,9 +42,15 @@ class LoadConfigTest(unittest.TestCase):
         Returns:
           Whatever load_config returns.
         """
-        return main.load_config(*args, **kwargs, subprocess_run=self._run)
+        return main.load_config(
+            *args,
+            **kwargs,
+            # Supress: "load_config" gets multiple values for keyword argument
+            # "subprocess_run"
+            subprocess_run=self._run,  # type: ignore[misc]
+        )
 
-    def _mock_dconf_list(self, paths):
+    def _mock_dconf_list(self, paths: Mapping[str, Sequence[str]]) -> None:
         """Mocks `dconf list`.
 
         Args:
@@ -50,19 +58,22 @@ class LoadConfigTest(unittest.TestCase):
             `dconf list`.
         """
 
-        def side_effect(args, **kwargs):
-            if args[:2] != ["dconf", "list"]:
-                return
-            items = paths[args[2]]
+        def side_effect(
+            args: Any,
+            **kwargs: Any,
+        ) -> subprocess.CompletedProcess[str]:
             completed_process = mock.create_autospec(
                 subprocess.CompletedProcess
             )
+            if args[:2] != ["dconf", "list"]:
+                return completed_process
+            items = paths[args[2]]
             completed_process.stdout = "".join((item + "\n" for item in items))
             return completed_process
 
         self._run.side_effect = side_effect
 
-    def test_set(self):
+    def test_set(self) -> None:
         preserved = self._load_config(
             [
                 {
@@ -131,7 +142,7 @@ class LoadConfigTest(unittest.TestCase):
             sorted(expected_calls), sorted(self._run.mock_calls)
         )
 
-    def test_reset(self):
+    def test_reset(self) -> None:
         self._mock_dconf_list(
             {
                 "/": ["foo", "bar", "some-dir/"],
@@ -188,7 +199,7 @@ class LoadConfigTest(unittest.TestCase):
             sorted(expected_reset_calls), sorted(actual_reset_calls)
         )
 
-    def test_dry_run_does_not_write_to_dconf(self):
+    def test_dry_run_does_not_write_to_dconf(self) -> None:
         self._mock_dconf_list(
             {
                 "/": ["foo", "bar", "some-dir/"],
@@ -225,11 +236,11 @@ class LoadConfigTest(unittest.TestCase):
 
 class MainTest(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self._run = mock.create_autospec(subprocess.run)
 
-    def _main(self, files):
+    def _main(self, files: Mapping[str, str]) -> None:
         """Calls main.
 
         Args:
@@ -242,11 +253,11 @@ class MainTest(unittest.TestCase):
                     fh.write(contents)
             main.main(conf_dir, subprocess_run=self._run)
 
-    def test_ignore_unknown_file(self):
+    def test_ignore_unknown_file(self) -> None:
         self._main({"foo.not-yaml": "bar"})
         self._run.assert_not_called()
 
-    def test_load_order(self):
+    def test_load_order(self) -> None:
         files = {}
         expected_reset_paths = []
         for i in range(100):
@@ -263,16 +274,16 @@ class MainTest(unittest.TestCase):
         actual_reset_paths = [call[1][0][3] for call in self._run.mock_calls]
         self.assertSequenceEqual(actual_reset_paths, expected_reset_paths)
 
-    def test_yaml_false_is_false(self):
+    def test_yaml_false_is_false(self) -> None:
         """Tests that 'false' in YAML is interpreted as False, not 'false'."""
         self._main({"foo.yaml": "- key: foo\n  reset: false\n"})
         self._run.assert_not_called()
 
-    def test_schema_validation_error(self):
+    def test_schema_validation_error(self) -> None:
         with self.assertRaises(jsonschema.ValidationError):
             self._main({"foo.yaml": '- key: foo\n  reset: "false"\n'})
 
-    def test_templating(self):
+    def test_templating(self) -> None:
         os.environ["FOO"] = "kumquat"
         self._main(
             {

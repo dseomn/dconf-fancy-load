@@ -36,9 +36,11 @@ Example config file:
 """
 
 import argparse
+from collections.abc import Collection, Mapping
 import os
 import subprocess
 import textwrap
+from typing import Any
 
 import jinja2
 import jsonschema
@@ -84,7 +86,7 @@ _SCHEMA = {
 }
 
 
-def _is_key(config_item, parent):
+def _is_key(config_item: Mapping[str, Any], parent: str) -> bool:
     """Returns true if the item is a key, false if it's a directory.
 
     Args:
@@ -105,7 +107,12 @@ def _is_key(config_item, parent):
     return "key" in config_item
 
 
-def _set_keys_in_dir(path, values, subprocess_run, dry_run=False):
+def _set_keys_in_dir(
+    path: str,
+    values: Mapping[str, str],
+    subprocess_run: Any,
+    dry_run: bool = False,
+) -> None:
     """Sets DConf keys in a directory.
 
     Args:
@@ -114,11 +121,11 @@ def _set_keys_in_dir(path, values, subprocess_run, dry_run=False):
       subprocess_run: Normally subprocess.run, but can be overriden in tests.
       dry_run: If true, just print actions.
     """
-    keyfile = ["[/]\n"]
+    keyfile_lines = ["[/]\n"]
     # Sort keys to make unit testing easier. (It doesn't matter to dconf load.)
     for key, value in sorted(values.items(), key=lambda kv: kv[0]):
-        keyfile.append("{}={}\n".format(key, value))
-    keyfile = "".join(keyfile)
+        keyfile_lines.append("{}={}\n".format(key, value))
+    keyfile = "".join(keyfile_lines)
     if dry_run:
         print("Load: {}\n{}".format(path, textwrap.indent(keyfile, "  ")))
     else:
@@ -127,7 +134,12 @@ def _set_keys_in_dir(path, values, subprocess_run, dry_run=False):
         )
 
 
-def _reset_path(path, subprocess_run, preserve=(), dry_run=False):
+def _reset_path(
+    path: str,
+    subprocess_run: Any,
+    preserve: Collection[str] = (),
+    dry_run: bool = False,
+) -> None:
     """Selectively resets a key or directory.
 
     Args:
@@ -158,7 +170,12 @@ def _reset_path(path, subprocess_run, preserve=(), dry_run=False):
         )
 
 
-def load_config(config, path="/", dry_run=False, subprocess_run=subprocess.run):
+def load_config(
+    config: Any,
+    path: str = "/",
+    dry_run: bool = False,
+    subprocess_run: Any = subprocess.run,
+) -> Collection[str]:
     """Loads DConf values from yaml.
 
     Args:
@@ -219,7 +236,11 @@ def load_config(config, path="/", dry_run=False, subprocess_run=subprocess.run):
     return preserve
 
 
-def main(config_directory, dry_run=False, subprocess_run=subprocess.run):
+def main(
+    config_directory: str,
+    dry_run: bool = False,
+    subprocess_run: Any = subprocess.run,
+) -> None:
     """Main.
 
     Args:
@@ -254,7 +275,7 @@ if __name__ == "__main__":
         raise RuntimeError("Specify either --dry-run or --force.")
     main(
         os.path.join(
-            os.getenv("HOME"), ".config", "dconf-fancy-load", "conf.d"
+            os.environ["HOME"], ".config", "dconf-fancy-load", "conf.d"
         ),
         dry_run=args.dry_run,
     )

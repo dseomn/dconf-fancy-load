@@ -6,6 +6,14 @@ profile = "google"
 skip_gitignore = true
 src_paths = ["."]
 
+[tool.mypy]
+disallow_any_generics = true
+disallow_untyped_defs = true
+packages = ["dconf_fancy_load"]
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_ignores = true
+
 [tool.pytest.ini_options]
 addopts = """\
   --cov=. \
