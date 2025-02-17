@@ -272,15 +272,8 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--dry-run", dest="dry_run", action="store_const", const=True
-    )
-    parser.add_argument(
-        "--force", dest="dry_run", action="store_const", const=False
-    )
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    if args.dry_run is None:
-        raise RuntimeError("Specify either --dry-run or --force.")
     main(
         config_directory=pathlib.Path.home().joinpath(
             ".config", "dconf-fancy-load", "conf.d"
