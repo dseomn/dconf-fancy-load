@@ -267,7 +267,7 @@ def main(
         loader=jinja2.FileSystemLoader(parsed_args.config_dir), autoescape=False
     )
     for path in sorted(parsed_args.config_dir.iterdir()):
-        if not path.name.endswith(".yaml"):
+        if not path.name.endswith(".yaml.jinja"):
             continue
         config = yaml.safe_load(
             jinja_env.get_template(path.name).render(env=os.environ)

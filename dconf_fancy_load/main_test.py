@@ -259,7 +259,7 @@ class MainTest(unittest.TestCase):
         files = {}
         expected_reset_paths = []
         for i in range(100):
-            files[f"{i:02d}.yaml"] = textwrap.dedent(
+            files[f"{i:02d}.yaml.jinja"] = textwrap.dedent(
                 f"""\
                     - key: key-{i:02d}
                       reset: true
@@ -272,18 +272,18 @@ class MainTest(unittest.TestCase):
 
     def test_yaml_false_is_false(self) -> None:
         """Tests that 'false' in YAML is interpreted as False, not 'false'."""
-        self._main({"foo.yaml": "- key: foo\n  reset: false\n"})
+        self._main({"foo.yaml.jinja": "- key: foo\n  reset: false\n"})
         self._run.assert_not_called()
 
     def test_schema_validation_error(self) -> None:
         with self.assertRaises(jsonschema.ValidationError):
-            self._main({"foo.yaml": '- key: foo\n  reset: "false"\n'})
+            self._main({"foo.yaml.jinja": '- key: foo\n  reset: "false"\n'})
 
     def test_templating(self) -> None:
         self.enterContext(mock.patch.dict(os.environ, {"FOO": "kumquat"}))
         self._main(
             {
-                "foo.yaml": textwrap.dedent(
+                "foo.yaml.jinja": textwrap.dedent(
                     """\
                         - key: foo
                           value: "'{{ env['FOO'] }}'"
