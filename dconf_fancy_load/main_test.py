@@ -13,37 +13,33 @@
 # limitations under the License.
 
 from collections.abc import Collection, Mapping, Sequence
-import os
-import pathlib
 import subprocess
-import tempfile
 import textwrap
 from typing import Any
 import unittest
 from unittest import mock
 
-import jsonschema
-
+from dconf_fancy_load import config
 from dconf_fancy_load import main
 
 
-class LoadConfigTest(unittest.TestCase):
+class LoadTest(unittest.TestCase):
 
     def setUp(self) -> None:
         super().setUp()
         self._run = mock.create_autospec(subprocess.run, spec_set=True)
 
-    def _load_config(self, *args: Any, **kwargs: Any) -> Collection[str]:
-        """Calls load_config with appropriate mocks.
+    def _load(self, *args: Any, **kwargs: Any) -> Collection[str]:
+        """Calls load with appropriate mocks.
 
         Args:
-            *args: Args to load_config.
+            *args: Args to load.
             **kwargs: Ditto.
 
         Returns:
-            Whatever load_config returns.
+            Whatever load returns.
         """
-        return main.load_config(*args, **kwargs, subprocess_run=self._run)
+        return main.load(*args, **kwargs, subprocess_run=self._run)
 
     def _mock_dconf_list(self, paths: Mapping[str, Sequence[str]]) -> None:
         """Mocks `dconf list`.
@@ -69,37 +65,28 @@ class LoadConfigTest(unittest.TestCase):
         self._run.side_effect = side_effect
 
     def test_set(self) -> None:
-        preserved = self._load_config(
-            [
-                {
-                    "key": "foo",
-                    "value": "'bar'",
-                },
-                {
-                    "dir": "some-dir",
-                    "children": [
-                        {
-                            "dir": "other-dir",
-                            "children": [
-                                {
-                                    "key": "kumquat",
-                                    "value": "17",
+        preserved = self._load(
+            config.Dir(
+                subdirs={
+                    "some-dir": config.Dir(
+                        subdirs={
+                            "other-dir": config.Dir(
+                                keys={
+                                    "kumquat": config.Key(value="17"),
+                                    "apple": config.Key(value="'orange'"),
                                 },
-                                {
-                                    "key": "apple",
-                                    "value": "'orange'",
-                                },
-                            ],
-                        }
-                    ],
+                            ),
+                        },
+                    ),
                 },
-            ]
+                keys={"foo": config.Key(value="'bar'")},
+            )
         )
         self.assertEqual(
             {
-                "/foo",
                 "/some-dir/other-dir/kumquat",
                 "/some-dir/other-dir/apple",
+                "/foo",
             },
             set(preserved),
         )
@@ -145,37 +132,23 @@ class LoadConfigTest(unittest.TestCase):
                 "/some-dir/other-dir/": ["apple", "kumquat"],
             }
         )
-        preserved = self._load_config(
-            [
-                {
-                    "key": "foo",
-                    "reset": True,
-                },
-                {
-                    "dir": "quux",
-                    "reset": False,
-                },
-                {
-                    "dir": "some-dir",
-                    "reset": True,
-                    "children": [
-                        {
-                            "dir": "other-dir",
-                            "reset": False,
-                            "children": [
-                                {
-                                    "key": "kumquat",
-                                    "reset": True,
-                                }
-                            ],
+        preserved = self._load(
+            config.Dir(
+                subdirs={
+                    "quux": config.Dir(reset=False),
+                    "some-dir": config.Dir(
+                        reset=True,
+                        subdirs={
+                            "other-dir": config.Dir(
+                                reset=False,
+                                keys={"kumquat": config.Key(reset=True)},
+                            ),
                         },
-                        {
-                            "key": "apple",
-                            "reset": False,
-                        },
-                    ],
+                        keys={"apple": config.Key(reset=False)},
+                    ),
                 },
-            ]
+                keys={"foo": config.Key(reset=True)},
+            )
         )
         self.assertEqual({"/quux/", "/some-dir/"}, preserved)
         expected_reset_paths = (
@@ -201,104 +174,24 @@ class LoadConfigTest(unittest.TestCase):
                 "/some-dir/": ["foo"],
             }
         )
-        self._load_config(
-            [
-                {
-                    "key": "foo",
-                    "reset": True,
+        self._load(
+            config.Dir(
+                subdirs={
+                    "some-dir": config.Dir(
+                        keys={"foo": config.Key(reset=True)},
+                    ),
                 },
-                {
-                    "key": "bar",
-                    "value": "42",
+                keys={
+                    "foo": config.Key(reset=True),
+                    "bar": config.Key(value="42"),
                 },
-                {
-                    "dir": "some-dir",
-                    "children": [
-                        {
-                            "key": "foo",
-                            "reset": True,
-                        }
-                    ],
-                },
-            ],
+            ),
             dry_run=True,
         )
         actual_write_calls = [
             call for call in self._run.mock_calls if call[1][0][1] != "list"
         ]
         self.assertSequenceEqual((), actual_write_calls)
-
-
-class MainTest(unittest.TestCase):
-
-    def setUp(self) -> None:
-        super().setUp()
-        self._run = mock.create_autospec(subprocess.run, spec_set=True)
-
-    def _main(self, files: Mapping[str, str]) -> None:
-        """Calls main.
-
-        Args:
-            file: Map from filename to string file contents, to put in the
-                directory read by main.
-        """
-        with tempfile.TemporaryDirectory() as conf_dir_name:
-            conf_dir = pathlib.Path(conf_dir_name)
-            for name, contents in files.items():
-                (conf_dir / name).write_text(contents)
-            main.main(
-                args=[f"--config-dir={conf_dir}"],
-                subprocess_run=self._run,
-            )
-
-    def test_ignore_unknown_file(self) -> None:
-        self._main({"foo.not-yaml": "bar"})
-        self._run.assert_not_called()
-
-    def test_load_order(self) -> None:
-        files = {}
-        expected_reset_paths = []
-        for i in range(100):
-            files[f"{i:02d}.yaml.jinja"] = textwrap.dedent(
-                f"""\
-                    - key: key-{i:02d}
-                      reset: true
-                """
-            )
-            expected_reset_paths.append(f"/key-{i:02d}")
-        self._main(files)
-        actual_reset_paths = [call[1][0][3] for call in self._run.mock_calls]
-        self.assertSequenceEqual(actual_reset_paths, expected_reset_paths)
-
-    def test_yaml_false_is_false(self) -> None:
-        """Tests that 'false' in YAML is interpreted as False, not 'false'."""
-        self._main({"foo.yaml.jinja": "- key: foo\n  reset: false\n"})
-        self._run.assert_not_called()
-
-    def test_schema_validation_error(self) -> None:
-        with self.assertRaises(jsonschema.ValidationError):
-            self._main({"foo.yaml.jinja": '- key: foo\n  reset: "false"\n'})
-
-    def test_templating(self) -> None:
-        self.enterContext(mock.patch.dict(os.environ, {"FOO": "kumquat"}))
-        self._main(
-            {
-                "foo.yaml.jinja": textwrap.dedent(
-                    """\
-                        - key: foo
-                          value: "'{{ env['FOO'] }}'"
-                    """
-                ),
-            }
-        )
-        expected_keyfile = textwrap.dedent(
-            """\
-                [/]
-                foo='kumquat'
-            """
-        )
-        self.assertEqual(1, len(self._run.mock_calls))
-        self.assertEqual(expected_keyfile, self._run.mock_calls[0][2]["input"])
 
 
 if __name__ == "__main__":
