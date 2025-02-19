@@ -20,7 +20,7 @@ import unittest
 from unittest import mock
 
 from dconf_fancy_load import config
-from dconf_fancy_load import main
+from dconf_fancy_load import load
 
 
 class LoadTest(unittest.TestCase):
@@ -39,7 +39,7 @@ class LoadTest(unittest.TestCase):
         Returns:
             Whatever load returns.
         """
-        return main.load(*args, **kwargs, subprocess_run=self._run)
+        return load.load(*args, **kwargs, subprocess_run=self._run)
 
     def _mock_dconf_list(self, paths: Mapping[str, Sequence[str]]) -> None:
         """Mocks `dconf list`.
