@@ -1,16 +1,17 @@
 [build-system]
 requires = [
   "setuptools",
+  "setuptools-scm",
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "dconf-fancy-load"
-version = "0"
 requires-python = ">=3.11"
 dependencies = [
   "jinja2",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 test = [
@@ -54,3 +55,7 @@ addopts = """\
 
 [tool.setuptools.packages.find]
 include = ["dconf_fancy_load", "dconf_fancy_load.*"]
+
+[tool.setuptools_scm]
+local_scheme = "node-and-timestamp"
+version_scheme = "no-guess-dev"
